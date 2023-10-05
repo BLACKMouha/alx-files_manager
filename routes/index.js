@@ -1,10 +1,10 @@
 const { getStats, getStatus } = require('../controllers/AppController');
-const { default: postNew } = require('../controllers/UsersController');
+const { default: UsersController } = require('../controllers/UsersController');
 
 const linkRoutes = (server) => {
   server.get('/status', getStatus);
   server.get('/stats', getStats);
-  server.post('/users', postNew);
+  server.post('/users', UsersController.postNew);
 };
 
 module.exports = linkRoutes;
