@@ -4,24 +4,28 @@ const dbClient = require('../utils/db');
 
 class UsersController {
   static async postNew(req, res) {
-    try {
-      const requestData = req.body;
-      const { email, password } = requestData;
-      if (!email) res.status(400).json({ error: 'Missing email' });
-      if (!password) res.status(400).json({ error: 'Missing password' });
-      const db = dbClient.client.db(process.env.DB_DATABASE || 'files_manager');
-      const users = db.collection('users');
-      const aUser = await users.findOne({ email });
-      if (aUser) res.status(400).json({ error: 'Already exist' });
-
-      const hashedPassword = sha1(password);
-      const newUser = { email, password: hashedPassword };
-      const result = await users.insertOne(newUser);
-      const id = result.ops[0]._id;
-      res.status(201).json({ id, email });
-    } catch (e) {
-      res.status(500).end({ error: e.toString() });
+    const requestData = req.body;
+    const { email, password } = requestData;
+    if (!email) {
+      res.status(400).json({ error: 'Missing email' });
+      return;
     }
+    if (!password) {
+      res.status(400).json({ error: 'Missing password' });
+      return;
+    }
+    const users = await dbClient.usersCollection();
+    const aUser = await users.findOne({ email });
+    if (aUser) {
+      res.status(400).json({ error: 'Already exist' });
+      return;
+    }
+
+    const hashedPassword = sha1(password);
+    const newUser = { email, password: hashedPassword };
+    const result = await users.insertOne(newUser);
+    const id = result.ops[0]._id;
+    res.status(201).json({ id, email });
   }
 }
 
