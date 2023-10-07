@@ -9,7 +9,6 @@ class AuthController {
     try {
       const authHeader = req.headers.authorization;
       if (!authHeader) {
-        res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
