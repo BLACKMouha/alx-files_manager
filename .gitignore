@@ -3,3 +3,5 @@ redis
 *main*.*
 *test*.*
 package-lock.json
+.vscode/settings.json
+*image*

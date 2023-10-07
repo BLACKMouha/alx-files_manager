@@ -24,9 +24,15 @@ class FilesController {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
+
+      const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
+      if (!fs.existsSync(FOLDER_PATH)) {
+        fs.mkdirSync(FOLDER_PATH, { recursive: true });
+      }
       const filesProps = req.body;
       const { name, type, data } = filesProps;
       let { parentId, isPublic } = filesProps;
+
       if (!name) {
         res.status(400).json({ error: 'Missing name' });
         return;
@@ -39,71 +45,123 @@ class FilesController {
         res.status(400).json({ error: 'Missing data' });
         return;
       }
-      if (!parentId) {
-        parentId = 0;
-      }
-      const files = await dbClient.filesCollection();
-      if (parentId !== 0) {
-        const parentFolder = await files.findOne({ parentId });
-        if (!parentFolder) {
-          res.status(400).json({ error: 'Parent not found' });
-          return;
-        }
-        if (parentFolder.type !== 'folder') {
-          res.status(400).json({ error: 'Parent is not a folder' });
-          return;
-        }
-      }
+
       if (isPublic === undefined) {
         isPublic = false;
       }
-      if (type === 'folder') {
-        const createFolderResult = await files.insertOne({
+      if (parentId === undefined) {
+        parentId = 0;
+      }
+
+      const files = await dbClient.filesCollection();
+
+      fs.mkdirSync(FOLDER_PATH, { recursive: true });
+
+      if (parentId === 0) {
+        if (type === 'folder') {
+          fs.mkdir(`${FOLDER_PATH}/${name}`, { recursive: true }, (err) => {
+            if (err) throw err;
+          });
+          const newFolderCreation = await files.insertOne({
+            userId: ObjectId(aUserId),
+            name,
+            type,
+            isPublic,
+            parentId: parentId.toString(),
+          });
+          const newFolder = newFolderCreation.ops[0];
+          res.status(201).json({
+            id: newFolder._id,
+            userId: newFolder.userId,
+            name: newFolder.name,
+            type: newFolder.type,
+            isPublic: newFolder.isPublic,
+            parentId: newFolder.parentId,
+          });
+          return;
+        }
+        const filename = uuidv4();
+        const buffer = Buffer.from(data || '', 'base64').toString('utf-8');
+        fs.writeFile(`${FOLDER_PATH}/${filename}`, buffer, (err) => {
+          if (err) throw err;
+        });
+        const newFileCreation = await files.insertOne({
           userId: ObjectId(aUserId),
           name,
           type,
           isPublic,
           parentId,
         });
-        const newFolder = createFolderResult.ops[0];
+        const newFile = newFileCreation.ops[0];
+        res.status(201).json({
+          id: newFile._id,
+          userId: aUserId,
+          name: newFile.name,
+          type: newFile.type,
+          isPublic: newFile.isPublic,
+          parentId: newFile.parentId,
+          localPath: `${FOLDER_PATH}/${filename}`,
+        });
+        return;
+      }
+      const parentFolder = await files.findOne({ _id: ObjectId(parentId) });
+      if (!parentFolder) {
+        res.status(400).json({ error: 'Parent not found' });
+        return;
+      }
+      if (parentFolder.type !== 'folder') {
+        res.status(400).json({ error: 'Parent is not a folder' });
+        return;
+      }
+      if (type === 'folder') {
+        fs.mkdir(`${FOLDER_PATH}/${parentFolder.name}/${name}`, { recursive: true }, (err) => {
+          if (err) throw err;
+        });
+        const newFolderCreation = await files.insertOne({
+          userId: ObjectId(aUserId),
+          name,
+          type,
+          isPublic,
+          parentId: parentId.toString(),
+          localPath: `${FOLDER_PATH}/${parentFolder.name}/${name}`,
+        });
+        const newFolder = newFolderCreation.ops[0];
         res.status(201).json({
           id: newFolder._id,
+          userId: newFolder.userId,
           name: newFolder.name,
           type: newFolder.type,
           isPublic: newFolder.isPublic,
           parentId: newFolder.parentId,
+          localPath: `${FOLDER_PATH}/${parentFolder.name}/${name}`,
         });
         return;
       }
-      const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
-      if (!fs.existsSync(folderPath)) {
-        fs.mkdirSync(folderPath, { recursive: true });
-      }
-      const fileName = uuidv4();
-      const filePath = `${folderPath}/${fileName}`;
-      fs.writeFile(filePath, Buffer.from(data, 'base64').toString('utf8'), (err) => {
+      const filename = uuidv4();
+      const buffer = Buffer.from(data || '', 'base64').toString('utf-8');
+      fs.writeFile(`${FOLDER_PATH}/${parentFolder.name}/${filename}`, buffer, (err) => {
         if (err) {
           res.status(400).json({ error: err.message });
+          throw err;
         }
       });
-      const result = await files.insertOne({
-        userId: ObjectId(aUserId),
+      const newFileCreation = await files.insertOne({
+        userId: aUserId,
         name,
-        type,
         isPublic,
         parentId,
-        localPath: filePath,
+        localPath: `${FOLDER_PATH}/${parentFolder.name}/${filename}`,
       });
-      const newFile = result.ops[0];
-      console.log(newFile);
+
+      const newFile = newFileCreation.ops[0];
       res.status(201).json({
         id: newFile._id,
-        userId: newFile.userId,
-        name: newFile.name,
-        type: newFile.type,
-        isPublic: newFile.isPublic,
-        parentId: newFile.parentId,
+        userId: aUserId,
+        name,
+        isPublic,
+        parentId,
       });
+      return;
     } catch (e) {
       res.status(500).json({ error: e.toString() });
       throw e;
