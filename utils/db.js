@@ -1,4 +1,3 @@
-const sha1 = require('sha1');
 const { MongoClient } = require('mongodb');
 
 class DBClient {
@@ -30,25 +29,6 @@ class DBClient {
 
   async filesCollection() {
     return this.client.db().collection('files');
-  }
-
-  async addUser(email, password) {
-    try {
-      if (!email) return new Error('Missing email');
-      if (!password) return new Error('Missing password');
-
-      const users = await this.usersCollection();
-      const aUser = await users.findOne({ email });
-      if (aUser) return new Error('Already exist');
-
-      const hashedPassword = sha1(password);
-      const newUser = { email, password: hashedPassword };
-      const result = await users.insertOne(newUser);
-      const id = result.ops[0]._id;
-      return { id, email };
-    } catch (e) {
-      return e.toString();
-    }
   }
 }
 
