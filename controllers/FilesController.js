@@ -13,25 +13,22 @@ class FilesController {
         return;
       }
       const key = `auth_${xTokenHeader}`;
-      const aUserId = await redisClient.get(key);
-      if (!aUserId) {
+      const userId = await redisClient.get(key);
+      if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
       const users = await dbClient.usersCollection();
-      const aUser = await users.findOne({ _id: ObjectId(aUserId) });
+      const aUser = await users.findOne({ _id: ObjectId(userId) });
       if (!aUser) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
 
-      const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
-      if (!fs.existsSync(FOLDER_PATH)) {
-        fs.mkdirSync(FOLDER_PATH, { recursive: true });
-      }
       const filesProps = req.body;
-      const { name, type, data } = filesProps;
-      let { parentId, isPublic } = filesProps;
+      const {
+        name, type, data, parentId, isPublic,
+      } = filesProps;
 
       if (!name) {
         res.status(400).json({ error: 'Missing name' });
@@ -46,120 +43,62 @@ class FilesController {
         return;
       }
 
-      if (isPublic === undefined) {
-        isPublic = false;
-      }
-      if (parentId === undefined) {
-        parentId = 0;
-      }
-
       const files = await dbClient.filesCollection();
-
-      fs.mkdirSync(FOLDER_PATH, { recursive: true });
-
-      if (parentId === 0) {
-        if (type === 'folder') {
-          fs.mkdir(`${FOLDER_PATH}/${name}`, { recursive: true }, (err) => {
-            if (err) throw err;
-          });
-          const newFolderCreation = await files.insertOne({
-            userId: ObjectId(aUserId),
-            name,
-            type,
-            isPublic,
-            parentId: parentId.toString(),
-          });
-          const newFolder = newFolderCreation.ops[0];
-          res.status(201).json({
-            id: newFolder._id,
-            userId: newFolder.userId,
-            name: newFolder.name,
-            type: newFolder.type,
-            isPublic: newFolder.isPublic,
-            parentId: newFolder.parentId,
-          });
+      if (parentId) {
+        const file = await files.findOne({ _id: ObjectId(parentId), userId: ObjectId(userId) });
+        if (!file) {
+          res.status(400).json({ error: 'Parent not found' });
           return;
         }
-        const filename = uuidv4();
-        const buffer = Buffer.from(data || '', 'base64').toString('utf-8');
-        fs.writeFile(`${FOLDER_PATH}/${filename}`, buffer, (err) => {
-          if (err) throw err;
-        });
+        if (file.type !== 'folder') {
+          res.status(400).json({ error: 'Parent is not a folder' });
+          return;
+        }
+      }
+      if (type === 'folder') {
         const newFileCreation = await files.insertOne({
-          userId: ObjectId(aUserId),
+          userId: ObjectId(userId),
           name,
           type,
+          parentId: parentId || 0,
           isPublic,
-          parentId,
         });
         const newFile = newFileCreation.ops[0];
         res.status(201).json({
           id: newFile._id,
-          userId: aUserId,
-          name: newFile.name,
-          type: newFile.type,
-          isPublic: newFile.isPublic,
-          parentId: newFile.parentId,
-          localPath: `${FOLDER_PATH}/${filename}`,
-        });
-        return;
-      }
-      const parentFolder = await files.findOne({ _id: ObjectId(parentId) });
-      if (!parentFolder) {
-        res.status(400).json({ error: 'Parent not found' });
-        return;
-      }
-      if (parentFolder.type !== 'folder') {
-        res.status(400).json({ error: 'Parent is not a folder' });
-        return;
-      }
-      if (type === 'folder') {
-        fs.mkdir(`${FOLDER_PATH}/${parentFolder.name}/${name}`, { recursive: true }, (err) => {
-          if (err) throw err;
-        });
-        const newFolderCreation = await files.insertOne({
-          userId: ObjectId(aUserId),
           name,
           type,
           isPublic,
-          parentId: parentId.toString(),
-          localPath: `${FOLDER_PATH}/${parentFolder.name}/${name}`,
-        });
-        const newFolder = newFolderCreation.ops[0];
-        res.status(201).json({
-          id: newFolder._id,
-          userId: newFolder.userId,
-          name: newFolder.name,
-          type: newFolder.type,
-          isPublic: newFolder.isPublic,
-          parentId: newFolder.parentId,
-          localPath: `${FOLDER_PATH}/${parentFolder.name}/${name}`,
+          parentId: parentId || 0,
         });
         return;
       }
-      const filename = uuidv4();
-      const buffer = Buffer.from(data || '', 'base64').toString('utf-8');
-      fs.writeFile(`${FOLDER_PATH}/${parentFolder.name}/${filename}`, buffer, (err) => {
-        if (err) {
-          res.status(400).json({ error: err.message });
-          throw err;
-        }
-      });
-      const newFileCreation = await files.insertOne({
-        userId: aUserId,
-        name,
-        isPublic,
-        parentId,
-        localPath: `${FOLDER_PATH}/${parentFolder.name}/${filename}`,
-      });
 
+      const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
+      if (!fs.existsSync(FOLDER_PATH)) {
+        fs.mkdirSync(FOLDER_PATH, { recursive: true });
+      }
+
+      const filename = uuidv4();
+      const filePath = `${FOLDER_PATH}/${filename}`;
+      const buffer = Buffer.from(data, 'base64');
+      fs.writeFile(filePath, buffer, { encoding: 'utf-8' }, (err) => { if (err) throw err; });
+      const newFileCreation = await files.insertOne({
+        userId: ObjectId(userId),
+        name,
+        type,
+        isPublic,
+        parentId: parentId || 0,
+        localPath: filePath,
+      });
       const newFile = newFileCreation.ops[0];
       res.status(201).json({
         id: newFile._id,
-        userId: aUserId,
+        userId: ObjectId(userId),
         name,
+        type,
         isPublic,
-        parentId,
+        parentId: parentId || 0,
       });
       return;
     } catch (e) {
