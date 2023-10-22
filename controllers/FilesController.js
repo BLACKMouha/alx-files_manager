@@ -60,17 +60,20 @@ class FilesController {
           userId: ObjectId(userId),
           name,
           type,
-          parentId: ObjectId(parentId) || 0,
+          parentId: parentId || 0,
           isPublic,
         });
+
         const newFile = newFileCreation.ops[0];
         res.status(201).json({
           id: newFile._id,
+          userId: ObjectId(userId),
           name,
           type,
           isPublic,
-          parentId: ObjectId(parentId) || 0,
+          parentId: parentId || 0,
         });
+
         return;
       }
 
@@ -81,16 +84,19 @@ class FilesController {
 
       const filename = uuidv4();
       const filePath = `${FOLDER_PATH}/${filename}`;
+
       const buffer = Buffer.from(data, 'base64');
       fs.writeFile(filePath, buffer, { encoding: 'utf-8' }, (err) => { if (err) throw err; });
+
       const newFileCreation = await files.insertOne({
         userId: ObjectId(userId),
         name,
         type,
         isPublic,
-        parentId: ObjectId(parentId) || 0,
+        parentId: parentId || 0,
         localPath: filePath,
       });
+
       const newFile = newFileCreation.ops[0];
       res.status(201).json({
         id: newFile._id,
@@ -98,8 +104,9 @@ class FilesController {
         name,
         type,
         isPublic,
-        parentId: ObjectId(parentId) || 0,
+        parentId: parentId || 0,
       });
+
       return;
     } catch (e) {
       res.status(500).json({ error: e.toString() });
