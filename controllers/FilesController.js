@@ -5,21 +5,27 @@ const dbClient = require('../utils/db');
 const redisClient = require('../utils/redis');
 
 class FilesController {
+  static async getUser(req) {
+    const xTokenHeader = req.headers['x-token'];
+    if (!xTokenHeader) {
+      return null;
+    }
+    const key = `auth_${xTokenHeader}`;
+    const userId = await redisClient.get(key);
+    if (!userId) {
+      return null;
+    }
+    const users = await dbClient.usersCollection();
+    const aUser = await users.findOne({ _id: ObjectId(userId) });
+    if (!aUser) {
+      return null;
+    }
+    return aUser;
+  }
+
   static async postUpload(req, res) {
     try {
-      const xTokenHeader = req.headers['x-token'];
-      if (!xTokenHeader) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
-      }
-      const key = `auth_${xTokenHeader}`;
-      const userId = await redisClient.get(key);
-      if (!userId) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
-      }
-      const users = await dbClient.usersCollection();
-      const aUser = await users.findOne({ _id: ObjectId(userId) });
+      const aUser = await FilesController.getUser(req);
       if (!aUser) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -45,7 +51,7 @@ class FilesController {
 
       const files = await dbClient.filesCollection();
       if (parentId) {
-        const parent = await files.findOne({ _id: ObjectId(parentId), userId: ObjectId(userId) });
+        const parent = await files.findOne({ _id: ObjectId(parentId), userId: aUser._id });
         if (!parent) {
           res.status(400).json({ error: 'Parent not found' });
           return;
@@ -57,7 +63,7 @@ class FilesController {
       }
       if (type === 'folder') {
         const newFileCreation = await files.insertOne({
-          userId: ObjectId(userId),
+          userId: aUser._id,
           name,
           type,
           parentId: parentId || 0,
@@ -67,7 +73,7 @@ class FilesController {
         const newFile = newFileCreation.ops[0];
         res.status(201).json({
           id: newFile._id,
-          userId: ObjectId(userId),
+          userId: aUser._id,
           name,
           type,
           isPublic,
@@ -89,7 +95,7 @@ class FilesController {
       fs.writeFile(filePath, buffer, { encoding: 'utf-8' }, (err) => { if (err) throw err; });
 
       const newFileCreation = await files.insertOne({
-        userId: ObjectId(userId),
+        userId: aUser._id,
         name,
         type,
         isPublic,
@@ -100,7 +106,7 @@ class FilesController {
       const newFile = newFileCreation.ops[0];
       res.status(201).json({
         id: newFile._id,
-        userId: ObjectId(userId),
+        userId: aUser._id,
         name,
         type,
         isPublic,
@@ -112,6 +118,53 @@ class FilesController {
       res.status(500).json({ error: e.toString() });
       throw e;
     }
+  }
+
+  static async getShow(req, res) {
+    try {
+      const aUser = await FilesController.getUser(req);
+      if (!aUser) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      const fileId = req.params.id;
+      const files = await dbClient.filesCollection();
+      const file = await files.findOne({ _id: ObjectId(fileId), userId: aUser._id });
+      if (!file) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+
+      res.status(200).json({
+        id: file._id,
+        userId: file.userId,
+        name: file.name,
+        type: file.type,
+        isPublic: file.isPublic,
+        parentId: file.parentId,
+      });
+      return;
+    } catch (e) {
+      res.status(500).json({ error: e.toString() });
+      throw e;
+    }
+  }
+
+  static async getIndex(req, res) {
+    const aUser = await FilesController.getUser(req);
+    if (!aUser) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const { parentId } = req.params;
+    const files = await dbClient.filesCollection();
+    const parent = files.findOne({ _id: ObjectId(parentId), userId: aUser._id });
+    if (!parent) {
+      res.json([]);
+      return;
+    }
+    const allFiles = await files.find({ parentId });
+    res.json({ allFiles });
   }
 }
 
