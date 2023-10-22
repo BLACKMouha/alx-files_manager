@@ -153,7 +153,7 @@ class FilesController {
       }
 
       const { parentId } = req.query;
-      const page = parseInt(req.query.page, 10) || 0;
+      const page = parseInt(req.query.page || 0, 10);
 
       const files = await dbClient.filesCollection();
 
