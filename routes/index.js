@@ -14,6 +14,8 @@ const linkRoutes = (server) => {
   server.get('/disconnect', AuthController.getDisconnect);
 
   server.post('/files', FilesController.postUpload);
+  server.get('/files/:id', FilesController.getShow);
+  server.get('/files', FilesController.getIndex);
 };
 
 module.exports = linkRoutes;

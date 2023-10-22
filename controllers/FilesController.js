@@ -33,8 +33,9 @@ class FilesController {
 
       const filesProps = req.body;
       const {
-        name, type, data, parentId, isPublic,
+        name, type, data, parentId,
       } = filesProps;
+      const isPublic = filesProps.isPublic || false;
 
       if (!name) {
         res.status(400).json({ error: 'Missing name' });
@@ -135,14 +136,7 @@ class FilesController {
         return;
       }
 
-      res.status(200).json({
-        id: file._id,
-        userId: file.userId,
-        name: file.name,
-        type: file.type,
-        isPublic: file.isPublic,
-        parentId: file.parentId,
-      });
+      res.json(file);
       return;
     } catch (e) {
       res.status(500).json({ error: e.toString() });
@@ -151,20 +145,44 @@ class FilesController {
   }
 
   static async getIndex(req, res) {
-    const aUser = await FilesController.getUser(req);
-    if (!aUser) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
+    try {
+      const aUser = await FilesController.getUser(req);
+      if (!aUser) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      const { parentId } = req.query;
+      const page = parseInt(req.query.page, 10) || 0;
+
+      const files = await dbClient.filesCollection();
+
+      const query = parentId
+        ? { userId: aUser._id, parentId }
+        : { userId: aUser._id };
+
+      const result = await files.aggregate([
+        { $match: query },
+        {
+          $facet: {
+            metadata: [{ $count: 'total' }, { $addFields: { page } }],
+            data: [{ $skip: 20 * page }, { $limit: 20 }],
+          },
+        },
+      ]);
+
+      const allFiles = [];
+      for await (const doc of result) {
+        const aFiles = doc.data;
+        aFiles.forEach((file) => {
+          allFiles.push({ ...file, id: file._id });
+        });
+      }
+      res.json(allFiles);
+    } catch (e) {
+      res.status(500).json({ error: e.toString() });
+      throw e;
     }
-    const { parentId } = req.params;
-    const files = await dbClient.filesCollection();
-    const parent = files.findOne({ _id: ObjectId(parentId), userId: aUser._id });
-    if (!parent) {
-      res.json([]);
-      return;
-    }
-    const allFiles = await files.find({ parentId });
-    res.json({ allFiles });
   }
 }
 
