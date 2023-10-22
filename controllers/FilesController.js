@@ -45,12 +45,12 @@ class FilesController {
 
       const files = await dbClient.filesCollection();
       if (parentId) {
-        const file = await files.findOne({ _id: ObjectId(parentId), userId: ObjectId(userId) });
-        if (!file) {
+        const parent = await files.findOne({ _id: ObjectId(parentId), userId: ObjectId(userId) });
+        if (!parent) {
           res.status(400).json({ error: 'Parent not found' });
           return;
         }
-        if (file.type !== 'folder') {
+        if (parent.type !== 'folder') {
           res.status(400).json({ error: 'Parent is not a folder' });
           return;
         }
@@ -60,7 +60,7 @@ class FilesController {
           userId: ObjectId(userId),
           name,
           type,
-          parentId: parentId || 0,
+          parentId: ObjectId(parentId) || 0,
           isPublic,
         });
         const newFile = newFileCreation.ops[0];
@@ -69,7 +69,7 @@ class FilesController {
           name,
           type,
           isPublic,
-          parentId: parentId || 0,
+          parentId: ObjectId(parentId) || 0,
         });
         return;
       }
@@ -88,7 +88,7 @@ class FilesController {
         name,
         type,
         isPublic,
-        parentId: parentId || 0,
+        parentId: ObjectId(parentId) || 0,
         localPath: filePath,
       });
       const newFile = newFileCreation.ops[0];
@@ -98,7 +98,7 @@ class FilesController {
         name,
         type,
         isPublic,
-        parentId: parentId || 0,
+        parentId: ObjectId(parentId) || 0,
       });
       return;
     } catch (e) {
