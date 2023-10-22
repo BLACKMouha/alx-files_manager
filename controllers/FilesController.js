@@ -165,7 +165,7 @@ class FilesController {
         { $match: query },
         {
           $facet: {
-            metadata: [{ $count: 'total' }, { $addFields: { page } }],
+            metadata: [{ $count: 'total' }, { $addFields: { page: page + 1 } }],
             data: [{ $skip: 20 * page }, { $limit: 20 }],
           },
         },
