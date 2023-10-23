@@ -165,7 +165,7 @@ class FilesController {
         { $match: query },
         {
           $facet: {
-            metadata: [{ $count: 'total' }, { $addFields: { page: page + 1 } }],
+            metadata: [{ $count: 'total' }, { $addFields: { page } }],
             data: [{ $skip: 20 * page }, { $limit: 20 }],
           },
         },
@@ -175,7 +175,14 @@ class FilesController {
       for await (const doc of result) {
         const aFiles = doc.data;
         aFiles.forEach((file) => {
-          allFiles.push({ ...file, id: file._id });
+          allFiles.push({
+            id: file._id,
+            userId: file.userId,
+            name: file.name,
+            type: file.type,
+            isPublic: file.isPublic,
+            parentId: file.parentId,
+          });
         });
       }
       res.json(allFiles);
