@@ -67,7 +67,7 @@ class FilesController {
           userId: aUser._id,
           name,
           type,
-          parentId: parentId || 0,
+          parentId: ObjectId(parentId) || 0,
           isPublic,
         });
 
@@ -78,7 +78,7 @@ class FilesController {
           name,
           type,
           isPublic,
-          parentId: parentId || 0,
+          parentId: ObjectId(parentId) || 0,
         });
 
         return;
@@ -100,7 +100,7 @@ class FilesController {
         name,
         type,
         isPublic,
-        parentId: parentId || 0,
+        parentId: ObjectId(parentId) || 0,
         localPath: filePath,
       });
 
@@ -111,7 +111,7 @@ class FilesController {
         name,
         type,
         isPublic,
-        parentId: parentId || 0,
+        parentId: ObjectId(parentId) || 0,
       });
 
       return;
@@ -158,7 +158,7 @@ class FilesController {
       const files = await dbClient.filesCollection();
 
       const query = parentId
-        ? { userId: aUser._id, parentId }
+        ? { userId: aUser._id, parentId: ObjectId(parentId) }
         : { userId: aUser._id };
 
       const result = await files.aggregate([
@@ -186,6 +186,7 @@ class FilesController {
         });
       }
       res.json(allFiles);
+      return;
     } catch (e) {
       res.status(500).json({ error: e.toString() });
       throw e;
