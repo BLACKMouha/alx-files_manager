@@ -1,3 +1,4 @@
+const mime = require('mime-types');
 const { ObjectId } = require('mongodb');
 const uuidv4 = require('uuid').v4;
 const fs = require('fs');
@@ -213,7 +214,14 @@ class FilesController {
         return;
       }
 
-      res.status(200).json(file);
+      res.status(200).json({
+        id: file._id,
+        userId: file.userId,
+        name: file.name,
+        type: file.type,
+        isPublic: file.isPublic,
+        parentId: file.parentId,
+      });
       return;
     } catch (e) {
       res.status(500).json({ error: e.toString() });
@@ -241,12 +249,50 @@ class FilesController {
         return;
       }
 
-      res.status(200).json(file);
+      res.status(200).json({
+        id: file._id,
+        userId: file.userId,
+        name: file.name,
+        type: file.type,
+        isPublic: file.isPublic,
+        parentId: file.parentId,
+      });
       return;
     } catch (e) {
       res.status(500).json({ error: e.toString() });
       throw e;
     }
+  }
+
+  static async getFile(req, res) {
+    const fileId = req.params.id;
+    const files = await dbClient.filesCollection();
+    const file = await files.findOne({ _id: ObjectId(fileId) });
+    if (!file) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+
+    if (!fs.existsSync(file.localPath)) {
+      res.status(404).json({ error: 'Not found!' });
+      return;
+    }
+
+    if (file.type === 'folder') {
+      res.status(400).json({ error: 'A folder doesn\'t have content' });
+      return;
+    }
+
+    if (!file.isPublic) {
+      const user = await FilesController.getUser(req);
+      if (!user) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+    }
+
+    const contentType = mime.contentType(file.name);
+    res.header('Content-Type', contentType).sendFile(file.localPath);
   }
 }
 

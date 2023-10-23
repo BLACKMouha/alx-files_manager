@@ -19,6 +19,8 @@ const linkRoutes = (server) => {
 
   server.put('/files/:id/publish', FilesController.putPublish);
   server.put('/files/:id/unpublish', FilesController.putUnpublish);
+
+  server.get('/files/:id/data', FilesController.getFile);
 };
 
 module.exports = linkRoutes;
