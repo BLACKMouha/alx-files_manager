@@ -1,4 +1,4 @@
-const { MongoClient, Ob } = require('mongodb');
+const { MongoClient } = require('mongodb');
 
 class DBClient {
   constructor() {

@@ -1,9 +1,12 @@
+const Queue = require('bull/lib/queue');
 const mime = require('mime-types');
 const { ObjectId } = require('mongodb');
 const uuidv4 = require('uuid').v4;
 const fs = require('fs');
 const dbClient = require('../utils/db');
 const redisClient = require('../utils/redis');
+
+const fileQueue = new Queue('fileQueue', 'redis://127.0.0.1:6379');
 
 class FilesController {
   static async getUser(req) {
@@ -114,6 +117,8 @@ class FilesController {
         isPublic,
         parentId: ObjectId(parentId) || 0,
       });
+
+      if (type === 'image') fileQueue.add({ userId: aUser._id, fileId: newFile._id });
 
       return;
     } catch (e) {
@@ -291,8 +296,12 @@ class FilesController {
       return;
     }
 
+    let filename = file.localPath;
+    const { size } = req.query;
+    if (size) filename += `_${size}`;
+
     const contentType = mime.contentType(file.name);
-    res.header('Content-Type', contentType).sendFile(file.localPath);
+    res.header('Content-Type', contentType).sendFile(filename);
   }
 }
 
