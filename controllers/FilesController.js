@@ -285,7 +285,7 @@ class FilesController {
 
     if (!file.isPublic) {
       const user = await FilesController.getUser(req);
-      if (!user) {
+      if (!user || user._id.toString() === file.userId.toString()) {
         res.status(404).json({ error: 'Not found' });
         return;
       }
