@@ -273,9 +273,12 @@ class FilesController {
       return;
     }
 
-    if (!fs.existsSync(file.localPath)) {
-      res.status(404).json({ error: 'Not found!' });
-      return;
+    if (!file.isPublic) {
+      const aUser = await FilesController.getUser(req);
+      if (!aUser || aUser._id.toString() !== file.userId.toString()) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
     }
 
     if (file.type === 'folder') {
@@ -283,12 +286,9 @@ class FilesController {
       return;
     }
 
-    if (!file.isPublic) {
-      const user = await FilesController.getUser(req);
-      if (!user || user._id.toString() === file.userId.toString()) {
-        res.status(404).json({ error: 'Not found' });
-        return;
-      }
+    if (!fs.existsSync(file.localPath)) {
+      res.status(404).json({ error: 'Not found' });
+      return;
     }
 
     const contentType = mime.contentType(file.name);
