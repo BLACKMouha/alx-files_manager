@@ -23,9 +23,9 @@ fileQueue.process(async (job, done) => {
       const fileName = file.localPath;
       const thumbnail = await imageThumbnail(fileName, { width });
 
-      const image500 = `${file.localPath}_${width}`;
+      const image = `${file.localPath}_${width}`;
 
-      fs.writeFile(image500, thumbnail, (err) => { if (err) done(err); });
+      fs.writeFile(image, thumbnail, (err) => { if (err) done(err); });
     });
     done();
   } catch (err) {
